@@ -133,7 +133,7 @@ object CataCommand {
             val masterComps = masterCataData?.tier_completions?.values ?: emptyList()
             val runs = comps.sum() - (cataData.tier_completions["total"] ?: 0.0) +
                     masterComps.sum() - (masterCataData?.tier_completions?.get("total") ?: 0.0)
-            val secretsPerRun = (secrets.toDouble() / runs).roundToPrecision(2)
+            val secretsPerRun = ((profileData.dungeons?.secrets ?: 0.0) / runs).roundToPrecision(2)
 
             val classAvgOverflow = (archLevel + bersLevel + healerLevel + mageLevel + tankLevel) / 5.0
             val classAvgCapped =
