@@ -198,9 +198,11 @@ object ScoreCalculation {
     // bonus stuff
     var crypts = BasicState(0)
     var mimicKilled = BasicState(false)
+    var princeKilled = BasicState(false)
     var isPaul = BasicState(false)
-    val bonusScore = (crypts.zip(mimicKilled.zip(isPaul))).map { (crypts, bools) ->
-        ((if (bools.first) 2 else 0) + crypts.coerceAtMost(5) + if (bools.second) 10 else 0)
+    val bonusScore = (crypts.zip(mimicKilled.zip(isPaul.zip(princeKilled)))).map { (crypts, bools) ->
+        ((if (bools.first) 2 else 0) + crypts.coerceAtMost(5)
+                + (if (bools.second.first) 10 else 0) + if (bools.second.second) 1 else 0)
     }
 
     var hasSaid270 = false
@@ -295,6 +297,7 @@ object ScoreCalculation {
                     if (dungeonFloorNumber?.let { it >= 6 } == true) {
                         ScoreCalculationElement.text.add("§f• §eMimic:§l${if (mimicKilled.get()) "§a ✔" else "§c ✘"}")
                     }
+                    ScoreCalculationElement.text.add("§f• §Prince:§l${if (princeKilled.get()) "§a ✔" else "§c ✘"}")
                     ScoreCalculationElement.text.add("")
                     ScoreCalculationElement.text.add("§6Score")
                     if (DungeonFeatures.dungeonFloor == "E")
@@ -467,6 +470,10 @@ object ScoreCalculation {
                 }
             }
         }
+        if (unformatted.equals("A Prince falls. +1 Bonus Score")) {
+            princeKilled.set(true)
+            return
+        }
     }
 
     @SubscribeEvent
@@ -494,6 +501,7 @@ object ScoreCalculation {
     @SubscribeEvent
     fun clearScore(event: WorldEvent.Unload) {
         mimicKilled.set(false)
+        princeKilled.set(false)
         firstDeathHadSpirit.set(false)
         floorReq.set(floorRequirements["default"]!!)
         missingPuzzles.set(0)
@@ -578,6 +586,7 @@ object ScoreCalculation {
                 "§f• §eSecrets: §a50§7/§a50 §7(§6Total: 50§7)",
                 "§f• §eCrypts:§a 5",
                 "§f• §eMimic:§a ✔",
+                "§f• §ePrince:§a ✔",
                 "",
                 "§6Score",
                 "§f• §eSkill Score:§a 100",
