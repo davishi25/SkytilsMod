@@ -126,6 +126,28 @@ object Config : Vigilant(
     var localAPIPassword = ""
 
     @Property(
+        type = PropertyType.SWITCH, name = "Use Hypixel API",
+        description = "Uses Hypixel API instead of Skytils API",
+        category = "General", subcategory = "Hypixel API",
+        protectedText = true,
+        i18nName = "skytils.config.general.hypixel_api",
+        i18nCategory = "skytils.config.general",
+        i18nSubcategory = "skytils.config.general.hypixel_api"
+    )
+    var useHypixelApi = false
+
+    @Property(
+        type = PropertyType.TEXT, name = "Hypixel API Key",
+        description = "Sets your Hypixel API key",
+        category = "General", subcategory = "Hypixel API",
+        protectedText = true,
+        i18nName = "skytils.config.general.hypixel_api_key",
+        i18nCategory = "skytils.config.general",
+        i18nSubcategory = "skytils.config.general.hypixel_api"
+    )
+    var hypixelApiKey = ""
+
+    @Property(
         type = PropertyType.BUTTON, name = "Join the Skytils Discord",
         description = "Join the Skytils Discord server for help using any of the features.",
         category = "General", subcategory = "Other",

@@ -35,8 +35,9 @@ object API {
         client.get {
             url {
                 protocol = URLProtocol.HTTPS
-                host = baseUrl
+                host = if(Skytils.config.useHypixelApi) "api.hypixel.net" else baseUrl
                 path("v2", "skyblock", "profiles")
+                if(Skytils.config.useHypixelApi) parameter("key", Skytils.config.hypixelApiKey)
                 parameter("uuid", uuid.toString())
             }
         }.body<TypesProfileResponse>().profiles
@@ -53,8 +54,9 @@ object API {
         client.get {
             url {
                 protocol = URLProtocol.HTTPS
-                host = baseUrl
+                host = if(Skytils.config.useHypixelApi) "api.hypixel.net" else baseUrl
                 path("v2", "player")
+                if(Skytils.config.useHypixelApi) parameter("key", Skytils.config.hypixelApiKey)
                 parameter("uuid", uuid.toString())
             }
         }.body<PlayerResponse>().player
