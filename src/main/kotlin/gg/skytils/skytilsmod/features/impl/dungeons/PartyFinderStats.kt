@@ -350,7 +350,7 @@ object PartyFinderStats {
                     val secrets = playerResponse.achievements.getOrDefault("skyblock_treasure_hunter", 0)
                     //UChat.chat("current floor: $currentFloor master? $master")
                     UMessage("§9Skytils » $name §8| §e${NumberUtil.nf.format(cataLevel)} " +
-                            "§8| §e${NumberUtil.nf.format(secrets)} §8| §e$pb")
+                            "§8| §e${NumberUtil.nf.format(secrets)} §8| ${if(master) "§cM" else "§eF"}$currentFloor $pb")
                         .append(
                         if(withKick) UTextComponent(" §c§l[KICK]").setHoverText("§cClick to kick ${name}§c.")
                             .setClick(ClickEvent.Action.SUGGEST_COMMAND, "/p kick $username") else ""
