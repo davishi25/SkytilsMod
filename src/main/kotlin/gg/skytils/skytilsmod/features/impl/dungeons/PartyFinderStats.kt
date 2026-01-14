@@ -27,12 +27,14 @@ import gg.skytils.skytilsmod.Skytils
 import gg.skytils.skytilsmod.Skytils.Companion.failPrefix
 import gg.skytils.skytilsmod.Skytils.Companion.mc
 import gg.skytils.skytilsmod.core.API
+import gg.skytils.skytilsmod.events.impl.GuiContainerEvent
 import gg.skytils.skytilsmod.utils.*
 import gg.skytils.skytilsmod.utils.NumberUtil.roundToPrecision
 import gg.skytils.skytilsmod.utils.NumberUtil.toRoman
 import gg.skytils.skytilsmod.utils.SkillUtils.level
 import kotlinx.coroutines.launch
 import net.minecraft.event.ClickEvent
+import net.minecraft.inventory.ContainerChest
 import net.minecraft.nbt.NBTTagCompound
 import net.minecraftforge.client.event.ClientChatReceivedEvent
 import net.minecraftforge.common.util.Constants
@@ -50,11 +52,13 @@ object PartyFinderStats {
         "^Party Finder > (?<name>\\w+) joined the dungeon group! \\((?<class>Archer|Berserk|Mage|Healer|Tank) Level (?<classLevel>\\d+)\\)$"
     )
     private val requiredRegex = Regex("§7§4☠ §cRequires §5.+§c.")
+    private var currentFloor = Skytils.config.lastKnownFloor
+    private var master = false
 
     @SubscribeEvent(receiveCanceled = true, priority = EventPriority.HIGHEST)
     fun onChat(event: ClientChatReceivedEvent) {
         if (!Utils.isOnHypixel || event.type == 2.toByte()) return
-        if (Skytils.config.partyFinderStats) {
+        if (Skytils.config.partyFinderStats != 0) {
             val match = partyFinderRegex.find(event.message.formattedText.stripControlCodes()) ?: return
             val username = match.groups["name"]?.value ?: return
             if (username == mc.thePlayer.name) return
@@ -73,8 +77,8 @@ object PartyFinderStats {
                     UChat.chat("$failPrefix §cFailed to get profile information for $username ($uuid)")
                     return@launch
                 }
-
-                playerStats(username, uuid, member, withKick)
+                if(Skytils.config.partyFinderStats == 1) playerStats(username, uuid, member, withKick)
+                else minimalPlayerStats(username, uuid, member, withKick)
             } catch (e: MojangUtil.MojangException) {
                 e.printStackTrace()
                 UChat.chat("$failPrefix §cFailed to get UUID, reason: ${e.message}")
@@ -300,6 +304,57 @@ object PartyFinderStats {
                     }
 
                     component.append("&2&m--------------------------------").chat()
+                } ?: UChat.chat("$failPrefix §c$username has not entered The Catacombs!")
+            } catch (e: Throwable) {
+                UChat.chat("$failPrefix §cCatacombs XP Lookup Failed: ${e.message ?: e::class.simpleName}")
+                e.printStackTrace()
+            }
+        } ?: UChat.chat("$failPrefix §cFailed to get dungeon stats for $username")
+    }
+
+    @SubscribeEvent
+    fun onGUIDrawnEvent(event: GuiContainerEvent.ForegroundDrawnEvent) {
+        if (event.container !is ContainerChest || event.chestName != "Party Finder" || Skytils.config.partyFinderStats != 2) return
+
+        val chest = event.container.inventory
+        val search = chest[50] ?: return // this is where the search settings item is
+        val lore = ItemUtil.getItemLore(search)
+        master = lore[3].substring(lore[3].indexOf("§b") + 2) != "The Catacombs"
+
+        val floor = lore[4].substring(lore[4].indexOf("Floor ") + 6)
+        val romanToInt = mapOf("I" to 1, "II" to 2, "III" to 3, "IV" to 4, "V" to 5, "VI" to 6, "VII" to 7)
+        currentFloor = romanToInt[floor] ?: 0
+        Skytils.config.lastKnownFloor = currentFloor
+    }
+
+    private suspend fun minimalPlayerStats(username: String, uuid: UUID, profileData: Member, withKick: Boolean) {
+        API.getPlayer(uuid)?.let { playerResponse ->
+            try {
+                profileData.dungeons?.dungeon_types?.get("catacombs")?.also { catacombsObj ->
+                    val cataData = catacombsObj.normal
+                    val masterCataData = catacombsObj.master
+
+                    val cataLevel =
+                        SkillUtils.calcXpWithProgress(catacombsObj.experience, SkillUtils.dungeoneeringXp.values)
+
+                    val name = playerResponse.formattedName
+
+                    val pb = if(master && masterCataData == null) "§cNo S+"
+                        else if(master) masterCataData!!.fastest_time_s_plus["$currentFloor"]?.toDuration(
+                        DurationUnit.MILLISECONDS
+                    )?.timeFormat() ?: "§cNo S+"
+                    else cataData.fastest_time_s_plus["$currentFloor"]?.toDuration(
+                        DurationUnit.MILLISECONDS
+                    )?.timeFormat() ?: "§cNo S+"
+
+                    val secrets = playerResponse.achievements.getOrDefault("skyblock_treasure_hunter", 0)
+                    //UChat.chat("current floor: $currentFloor master? $master")
+                    UMessage("§9Skytils » $name §8| §e${NumberUtil.nf.format(cataLevel)} " +
+                            "§8| §e${NumberUtil.nf.format(secrets)} §8| §e$pb")
+                        .append(
+                        if(withKick) UTextComponent(" §c§l[KICK]").setHoverText("§cClick to kick ${name}§c.")
+                            .setClick(ClickEvent.Action.SUGGEST_COMMAND, "/p kick $username") else ""
+                    ).chat()
                 } ?: UChat.chat("$failPrefix §c$username has not entered The Catacombs!")
             } catch (e: Throwable) {
                 UChat.chat("$failPrefix §cCatacombs XP Lookup Failed: ${e.message ?: e::class.simpleName}")
