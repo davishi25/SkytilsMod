@@ -27,18 +27,29 @@ import gg.skytils.skytilsmod.Skytils
 import gg.skytils.skytilsmod.Skytils.Companion.failPrefix
 import gg.skytils.skytilsmod.Skytils.Companion.mc
 import gg.skytils.skytilsmod.core.API
+import gg.skytils.skytilsmod.core.PersistentSave
 import gg.skytils.skytilsmod.events.impl.GuiContainerEvent
 import gg.skytils.skytilsmod.utils.*
+import gg.skytils.skytilsmod.utils.NumberUtil.romanToDecimal
 import gg.skytils.skytilsmod.utils.NumberUtil.toRoman
 import gg.skytils.skytilsmod.utils.SkillUtils.level
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 import net.minecraft.event.ClickEvent
+import net.minecraft.init.Items
 import net.minecraft.inventory.ContainerChest
 import net.minecraft.nbt.NBTTagCompound
 import net.minecraftforge.client.event.ClientChatReceivedEvent
 import net.minecraftforge.common.util.Constants
 import net.minecraftforge.fml.common.eventhandler.EventPriority
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent
+import java.io.File
+import java.io.Reader
+import java.io.Writer
 import java.util.*
 import kotlin.math.floor
 import kotlin.time.Duration
@@ -51,13 +62,21 @@ object PartyFinderStats {
         "^Party Finder > (?<name>\\w+) joined the dungeon group! \\((?<class>Archer|Berserk|Mage|Healer|Tank) Level (?<classLevel>\\d+)\\)$"
     )
     private val requiredRegex = Regex("§7§4☠ §cRequires §5.+§c.")
-    private var currentFloor = Skytils.config.lastKnownFloor
+    private var currentFloor = 0
     private var master = false
+    private var queueFloor = 0
+    private var queueMaster = false
+    val save = LastKnownFloorSave
 
     @SubscribeEvent(receiveCanceled = true, priority = EventPriority.HIGHEST)
     fun onChat(event: ClientChatReceivedEvent) {
         if (!Utils.isOnHypixel || event.type == 2.toByte()) return
-        if (Skytils.config.partyFinderStats != 0) {
+        if (Skytils.config.partyFinderStats) {
+            if (Skytils.config.useMinimalPartyFinderStats && event.message.formattedText == "§r§eQueueing your party...§r") {
+                currentFloor = queueFloor
+                master = queueMaster
+                PersistentSave.markDirty<LastKnownFloorSave>()
+            }
             val match = partyFinderRegex.find(event.message.formattedText.stripControlCodes()) ?: return
             val username = match.groups["name"]?.value ?: return
             if (username == mc.thePlayer.name) return
@@ -76,8 +95,8 @@ object PartyFinderStats {
                     UChat.chat("$failPrefix §cFailed to get profile information for $username ($uuid)")
                     return@launch
                 }
-                if(Skytils.config.partyFinderStats == 1) playerStats(username, uuid, member, withKick)
-                else minimalPlayerStats(username, uuid, member, withKick)
+                if(Skytils.config.useMinimalPartyFinderStats && !withKick) minimalPlayerStats(username, uuid, member)
+                else playerStats(username, uuid, member, withKick)
             } catch (e: MojangUtil.MojangException) {
                 e.printStackTrace()
                 UChat.chat("$failPrefix §cFailed to get UUID, reason: ${e.message}")
@@ -306,20 +325,43 @@ object PartyFinderStats {
 
     @SubscribeEvent
     fun onGUIDrawnEvent(event: GuiContainerEvent.ForegroundDrawnEvent) {
-        if (event.container !is ContainerChest || event.chestName != "Party Finder" || Skytils.config.partyFinderStats != 2) return
-
+        if (event.container !is ContainerChest || !Skytils.config.useMinimalPartyFinderStats) return
         val chest = event.container.inventory
-        val search = chest[50] ?: return // this is where the search settings item is
-        val lore = ItemUtil.getItemLore(search)
-        master = lore[3].substring(lore[3].indexOf("§b") + 2) != "The Catacombs"
+        when (event.chestName) {
+            "Party Finder" -> {
+                /*
+                 * the 'Your Party' item is at slot 53,
+                 * the 'Search Settings' item is at slot 50,
+                 * the line containing whether master mode is enabled
+                 * is always 1 line before the line containing the floor number
+                 */
+                val search = if(chest[53]?.item == Items.skull) chest[53] else chest[50] ?: return
+                val loreLine = if (search.item == Items.skull) 0 else 3
+                val modeLine = loreLine
+                val floorLine = loreLine + 1
 
-        val floor = lore[4].substring(lore[4].indexOf("Floor ") + 6)
-        val romanToInt = mapOf("I" to 1, "II" to 2, "III" to 3, "IV" to 4, "V" to 5, "VI" to 6, "VII" to 7)
-        currentFloor = romanToInt[floor] ?: 0
-        Skytils.config.lastKnownFloor = currentFloor
+                val lore = ItemUtil.getItemLore(search)
+                master = lore[modeLine].substringAfter("§b") != "The Catacombs"
+
+                val floor = lore[floorLine].substringAfter("Floor ")
+                currentFloor = floor.romanToDecimal()
+            }
+            "Group Builder" -> {
+                val selectDungeon = chest[11] ?: return // this is where the select dungeon item is
+                val dungeonLore = ItemUtil.getItemLore(selectDungeon)
+                queueMaster = dungeonLore[3].substringAfter("§b") != "The Catacombs"
+
+                val selectFloor = chest[12] ?: return // this is where the select dungeon item is
+                val floorLore = ItemUtil.getItemLore(selectFloor)
+                val floor = floorLore[3].substringAfter("Floor ")
+                queueFloor = floor.romanToDecimal()
+            }
+            else -> { return }
+        }
+        PersistentSave.markDirty<LastKnownFloorSave>()
     }
 
-    private suspend fun minimalPlayerStats(username: String, uuid: UUID, profileData: Member, withKick: Boolean) {
+    private suspend fun minimalPlayerStats(username: String, uuid: UUID, profileData: Member) {
         API.getPlayer(uuid)?.let { playerResponse ->
             try {
                 profileData.dungeons?.dungeon_types?.get("catacombs")?.also { catacombsObj ->
@@ -342,10 +384,10 @@ object PartyFinderStats {
                     val secrets = playerResponse.achievements.getOrDefault("skyblock_treasure_hunter", 0)
                     //UChat.chat("current floor: $currentFloor master? $master")
                     UMessage("§9Skytils » $name §8| §e${NumberUtil.nf.format(cataLevel)} " +
-                            "§8| §e${NumberUtil.nf.format(secrets)} §8| ${if(master) "§cM" else "§eF"}$currentFloor $pb")
+                            "§8| §e${NumberUtil.nf.format(secrets)} §8| ${if(master) "§cM" else "§eF"}$currentFloor S+: $pb")
                         .append(
-                        if(withKick) UTextComponent(" §c§l[KICK]").setHoverText("§cClick to kick ${name}§c.")
-                            .setClick(ClickEvent.Action.SUGGEST_COMMAND, "/p kick $username") else ""
+                            UTextComponent(" §c§l[KICK]").setHoverText("§cClick to kick ${name}§c.")
+                            .setClick(ClickEvent.Action.SUGGEST_COMMAND, "/p kick $username")
                     ).chat()
                 } ?: UChat.chat("$failPrefix §c$username has not entered The Catacombs!")
             } catch (e: Throwable) {
@@ -353,6 +395,31 @@ object PartyFinderStats {
                 e.printStackTrace()
             }
         } ?: UChat.chat("$failPrefix §cFailed to get dungeon stats for $username")
+    }
+
+    object LastKnownFloorSave : PersistentSave(File(Skytils.modDir, "partyFinderStats.json")) {
+        override fun read(reader: Reader) {
+            val data = json.decodeFromString<JsonElement>(reader.readText())
+            if (data is JsonObject) {
+                json.decodeFromJsonElement<Schema>(data).also {
+                    currentFloor = it.currentFloor
+                    master = it.master
+                    queueFloor = it.queueFloor
+                    queueMaster = it.queueMaster
+                }
+            }
+        }
+
+        override fun write(writer: Writer) {
+            writer.write(json.encodeToString(Schema(currentFloor,master,queueFloor,queueMaster)))
+        }
+
+        override fun setDefault(writer: Writer) {
+            writer.write(json.encodeToString(Schema()))
+        }
+
+        @Serializable
+        data class Schema(val currentFloor : Int = 0, val master: Boolean = false, val queueFloor : Int = 0, val queueMaster : Boolean = false)
     }
 
     private fun Duration.timeFormat() = toComponents { minutes, seconds, _ ->

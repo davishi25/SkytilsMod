@@ -313,16 +313,24 @@ object Config : Vigilant(
     var dungeonDeathCounter = false
 
     @Property(
-        type = PropertyType.SELECTOR, name = "Party Finder Stats",
+        type = PropertyType.SWITCH, name = "Party Finder Stats",
         description = "§b[WIP] Displays Stats about a Player who joined.",
         category = "Dungeons", subcategory = "Party Finder",
-        options = ["Off","Default","Minimized"],
         i18nName = "skytils.config.dungeons.party_finder.party_finder_stats",
         i18nCategory = "skytils.config.dungeons",
         i18nSubcategory = "skytils.config.dungeons.party_finder"
     )
-    var partyFinderStats = 0
-    var lastKnownFloor = 0
+    var partyFinderStats = false
+
+    @Property(
+        type = PropertyType.SWITCH, name = "Use Minimal Party Finder Stats",
+        description = "Changes party finder stats to only include catacombs level, secrets, and fastest S+ time.",
+        category = "Dungeons", subcategory = "Party Finder",
+        i18nName = "skytils.config.dungeons.party_finder.minimal_pf_stats",
+        i18nCategory = "skytils.config.dungeons",
+        i18nSubcategory = "skytils.config.dungeons.party_finder"
+    )
+    var useMinimalPartyFinderStats = false
 
     @Property(
         type = PropertyType.SWITCH, name = "Dungeon Chest Profit",
@@ -4476,6 +4484,8 @@ object Config : Vigilant(
 
         addDependency("message300Score", "sendMessageOn300Score")
         addDependency("messageTitle300Score", "createTitleOn300Score")
+
+        addDependency("useMinimalPartyFinderStats","partyFinderStats")
 
         addDependency("bloodHelperColor", "bloodHelper")
         addDependency("boxStarredMobsColor", "boxStarredMobs")
