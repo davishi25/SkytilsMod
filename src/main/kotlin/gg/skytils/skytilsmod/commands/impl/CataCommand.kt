@@ -28,6 +28,7 @@ import gg.skytils.skytilsmod.Skytils.Companion.failPrefix
 import gg.skytils.skytilsmod.Skytils.Companion.mc
 import gg.skytils.skytilsmod.core.API
 import gg.skytils.skytilsmod.utils.*
+import gg.skytils.skytilsmod.utils.NumberUtil.roundToPrecision
 import kotlinx.coroutines.launch
 import org.incendo.cloud.annotations.Argument
 import org.incendo.cloud.annotations.Command
@@ -42,12 +43,12 @@ object CataCommand {
     @Command("skytilscata [name]")
     suspend fun processCommand(
         @Argument("name")
-        name: String? = null
+        name: String = ""
     ) = Skytils.IO.launch {
-        val username = name ?: mc.thePlayer.name
+        val username = if(name.equals("")) mc.thePlayer.name else name
         UChat.chat("§aGetting data for ${username}...")
         val uuid = try {
-            if (name == null) mc.thePlayer.uniqueID else MojangUtil.getUUIDFromUsername(username)
+            MojangUtil.getUUIDFromUsername(username)
         } catch (e: MojangUtil.MojangException) {
             UChat.chat("$failPrefix §cFailed to get UUID, reason: ${e.message}")
             return@launch
@@ -128,6 +129,11 @@ object CataCommand {
                 )
 
             val secrets = playerResponse?.achievements?.getOrDefault("skyblock_treasure_hunter", 0) ?: 0
+            val comps = cataData.tier_completions.values
+            val masterComps = masterCataData?.tier_completions?.values ?: emptyList()
+            val runs = comps.sum() - (cataData.tier_completions["total"] ?: 0.0) +
+                    masterComps.sum() - (masterCataData?.tier_completions?.get("total") ?: 0.0)
+            val secretsPerRun = ((profileData.dungeons?.secrets ?: 0.0) / runs).roundToPrecision(2)
 
             val classAvgOverflow = (archLevel + bersLevel + healerLevel + mageLevel + tankLevel) / 5.0
             val classAvgCapped =
@@ -268,6 +274,7 @@ object CataCommand {
             component
                 .append("§a§l➜ Miscellaneous:\n")
                 .append(" §aTotal Secrets Found: §l➡ §e${NumberUtil.nf.format(secrets)}\n")
+                .append(" §aSecrets/Run: §l➡ §e${NumberUtil.nf.format(secretsPerRun)}\n")
                 .append(
                     " §aBlood Mobs Killed: §l➡ §e${
                         NumberUtil.nf.format(

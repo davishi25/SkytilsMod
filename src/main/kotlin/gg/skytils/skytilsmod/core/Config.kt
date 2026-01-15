@@ -126,6 +126,28 @@ object Config : Vigilant(
     var localAPIPassword = ""
 
     @Property(
+        type = PropertyType.SWITCH, name = "Use Hypixel API",
+        description = "Uses Hypixel API instead of Skytils API",
+        category = "General", subcategory = "Hypixel API",
+        protectedText = true,
+        i18nName = "skytils.config.general.hypixel_api",
+        i18nCategory = "skytils.config.general",
+        i18nSubcategory = "skytils.config.general.hypixel_api"
+    )
+    var useHypixelApi = false
+
+    @Property(
+        type = PropertyType.TEXT, name = "Hypixel API Key",
+        description = "Sets your Hypixel API key",
+        category = "General", subcategory = "Hypixel API",
+        protectedText = true,
+        i18nName = "skytils.config.general.hypixel_api_key",
+        i18nCategory = "skytils.config.general",
+        i18nSubcategory = "skytils.config.general.hypixel_api"
+    )
+    var hypixelApiKey = ""
+
+    @Property(
         type = PropertyType.BUTTON, name = "Join the Skytils Discord",
         description = "Join the Skytils Discord server for help using any of the features.",
         category = "General", subcategory = "Other",
@@ -437,6 +459,16 @@ object Config : Vigilant(
         i18nSubcategory = "skytils.config.dungeons.miscellaneous"
     )
     var necronPhaseTimer = false
+
+    @Property(
+        type = PropertyType.SWITCH, name = "Goldor Terminal Attribution",
+        description = "Displays how many terminals teammates did in phase 3",
+        category = "Dungeons", subcategory = "Miscellaneous",
+        i18nName = "skytils.config.dungeons.miscellaneous.terminal_attribution",
+        i18nCategory = "skytils.config.dungeons",
+        i18nSubcategory = "skytils.config.dungeons.miscellaneous"
+    )
+    var terminalAttribution = false
 
     @Property(
         type = PropertyType.SWITCH, name = "Red Screen Fix",
@@ -2825,7 +2857,7 @@ object Config : Vigilant(
         type = PropertyType.SELECTOR, name = "Custom Damage Splash Style",
         description = "§b[WIP] §rReplaces Skyblock damage splashes with custom rendered ones.",
         category = "Miscellaneous", subcategory = "Quality of Life",
-        options = ["Off", "Comma", "Truncate"],
+        options = ["Off", "Comma", "Truncate","Hidden"],
         i18nName = "skytils.config.miscellaneous.quality_of_life.custom_damage_splash_style",
         i18nCategory = "skytils.config.miscellaneous",
         i18nSubcategory = "skytils.config.miscellaneous.quality_of_life"
