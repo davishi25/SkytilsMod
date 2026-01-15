@@ -96,7 +96,7 @@ object PartyFinderStats {
                     UChat.chat("$failPrefix §cFailed to get profile information for $username ($uuid)")
                     return@launch
                 }
-                if(Skytils.config.useMinimalPartyFinderStats && !withKick) minimalPlayerStats(username, uuid, member)
+                if(Skytils.config.useMinimalPartyFinderStats) minimalPlayerStats(username, uuid, member, withKick)
                 else playerStats(username, uuid, member, withKick)
             } catch (e: MojangUtil.MojangException) {
                 e.printStackTrace()
@@ -369,7 +369,7 @@ object PartyFinderStats {
         PersistentSave.markDirty<LastKnownFloorSave>()
     }
 
-    private suspend fun minimalPlayerStats(username: String, uuid: UUID, profileData: Member) {
+    private suspend fun minimalPlayerStats(username: String, uuid: UUID, profileData: Member, withKick: Boolean) {
         API.getPlayer(uuid)?.let { playerResponse ->
             try {
                 profileData.dungeons?.dungeon_types?.get("catacombs")?.also { catacombsObj ->
@@ -394,8 +394,10 @@ object PartyFinderStats {
                     UMessage("§9Skytils » $name §8| §e${NumberUtil.nf.format(cataLevel)} " +
                             "§8| §e${NumberUtil.nf.format(secrets)} §8| ${if(master) "§cM" else "§eF"}$currentFloor S+: $pb")
                         .append(
-                            UTextComponent(" §c§l[KICK]").setHoverText("§cClick to kick ${name}§c.")
-                            .setClick(ClickEvent.Action.SUGGEST_COMMAND, "/p kick $username")
+                            if(withKick)
+                                UTextComponent(" §c§l[KICK]").setHoverText("§cClick to kick ${name}§c.")
+                                .setClick(ClickEvent.Action.SUGGEST_COMMAND, "/p kick $username")
+                            else ""
                     ).chat()
                 } ?: UChat.chat("$failPrefix §c$username has not entered The Catacombs!")
             } catch (e: Throwable) {
